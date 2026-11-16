@@ -46,6 +46,29 @@ async function extractReceipt(imageBase64, mimeType) {
   return JSON.parse(res.choices[0].message.content);
 }
 
+app.use(express.json());
+
+app.post('/api/expenses', async (req, res) => {
+  try {
+    const { merchant, amount, date, category } = req.body || {};
+    const amt = Number(amount);
+    if (!merchant || !Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ error: 'merchant and a positive amount are required.' });
+    }
+    const row = {
+      spent_at: /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : new Date().toISOString().slice(0, 10),
+      merchant: String(merchant).slice(0, 120),
+      amount: amt,
+      category: CATEGORIES.includes(category) ? category : 'Other',
+    };
+    const { error } = await supabase.from('expenses').insert(row);
+    if (error) throw error;
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to save expense.' });
+  }
+});
+
 app.post('/api/receipts', upload.single('receipt'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No receipt image uploaded.' });

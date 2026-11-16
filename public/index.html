@@ -82,6 +82,12 @@
   }
   #toast.show { opacity: 1; }
   .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 15px; background: var(--bg); color: var(--text);
+  }
   .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin: 20px 0 8px; }
 </style>
 </head>
@@ -103,13 +109,27 @@
   </div>
 
   <div id="capture-section">
-    <div class="section-title">New receipt</div>
-    <div class="card" id="capture-card">
+    <div class="section-title">New expense</div>
+    <div class="card">
       <div id="drop">
         <div style="font-size:32px">📷</div>
-        <div>Tap to snap or upload a receipt</div>
+        <div>Tap to snap or upload a receipt — AI fills it in</div>
       </div>
       <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden">
+      <div id="manual-toggle" style="text-align:center;color:var(--accent);font-size:14px;margin-top:12px;cursor:pointer;font-weight:600;">＋ Or add manually</div>
+    </div>
+    <div class="card hidden" id="manual-card">
+      <div class="field"><label>Merchant</label><input id="m-merchant" placeholder="e.g. Coffee Shop"></div>
+      <div class="field"><label>Amount</label><input id="m-amount" type="number" step="0.01" min="0.01" placeholder="0.00" inputmode="decimal"></div>
+      <div class="field"><label>Date</label><input id="m-date" type="date"></div>
+      <div class="field"><label>Category</label>
+        <select id="m-category">
+          <option>Groceries</option><option>Dining</option><option>Transport</option>
+          <option>Shopping</option><option>Bills</option><option>Health</option>
+          <option>Entertainment</option><option>Other</option>
+        </select>
+      </div>
+      <button id="manual-save" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Save expense</button>
     </div>
   </div>
 
@@ -231,6 +251,40 @@ $('snap-btn').addEventListener('click', () => $('file-input').click());
 $('cancel-btn').addEventListener('click', cancelPreview);
 $('prev-month').addEventListener('click', () => shiftMonth(-1));
 $('next-month').addEventListener('click', () => shiftMonth(1));
+
+// Manual entry
+$('manual-toggle').addEventListener('click', () => {
+  const card = $('manual-card');
+  card.classList.toggle('hidden');
+  if (!card.classList.contains('hidden')) {
+    $('m-date').value = state.month + '-' + String(new Date().getDate()).padStart(2, '0');
+    $('m-merchant').focus();
+  }
+});
+$('manual-save').addEventListener('click', async () => {
+  const body = {
+    merchant: $('m-merchant').value.trim(),
+    amount: parseFloat($('m-amount').value),
+    date: $('m-date').value,
+    category: $('m-category').value,
+  };
+  if (!body.merchant || !Number.isFinite(body.amount) || body.amount <= 0) {
+    toast('⚠️ Merchant and amount are required');
+    return;
+  }
+  const res = await fetch('/api/expenses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) { toast('⚠️ Failed to save'); return; }
+  const saved = await res.json();
+  $('m-merchant').value = ''; $('m-amount').value = '';
+  $('manual-card').classList.add('hidden');
+  state.month = saved.spent_at.slice(0, 7);
+  await loadMonth();
+  toast(`Added: ${saved.merchant} · ${fmt(saved.amount)} · ${saved.category}`);
+});
 
 loadMonth();
 </script>
