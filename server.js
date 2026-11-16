@@ -10,7 +10,10 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL || undefined,
+});
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -22,8 +25,9 @@ const CATEGORIES = [
 ];
 
 async function extractReceipt(imageBase64, mimeType) {
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const res = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model,
     max_tokens: 300,
     messages: [
       {
